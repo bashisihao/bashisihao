@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>📚 简搜 · 免费电子书聚合搜索</title>
+    <meta name="description" content="聚合搜索多个免费电子书资源库，支持Gutenberg、Open Library、Google Books等数据源">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <header class="header">
+        <div class="header-content">
+            <a href="/" class="logo">
+                <span class="logo-icon">📚</span>
+                <span class="logo-text">简搜</span>
+            </a>
+            <div class="header-right">
+                <a href="https://github.com" class="github-link" target="_blank" rel="noopener" title="GitHub">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57C20.565 21.795 24 17.31 24 12c0-6.63-5.37-12-12-12z"/>
+                    </svg>
+                    <span>开源</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 搜索主体 -->
+    <main class="main">
+        <!-- 搜索框区域 -->
+        <div class="search-section">
+            <h1 class="search-title">免费电子书聚合搜索</h1>
+            <p class="search-subtitle">聚合 Gutenberg · Open Library · Google Books 三大资源库</p>
+            
+            <div class="search-box-wrapper">
+                <div class="search-box">
+                    <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="searchInput" class="search-input" placeholder="输入书名、作者或关键词..." autocomplete="off" autofocus>
+                    <button id="searchBtn" class="search-btn">搜索</button>
+                </div>
+            </div>
+
+            <!-- 筛选选项 -->
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <label class="filter-label">数据源</label>
+                    <div class="source-checkboxes">
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="gutenberg" checked> Gutenberg
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="openlibrary" checked> Open Library
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="google" checked> Google Books
+                        </label>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">语言</label>
+                    <select id="langSelect" class="lang-select">
+                        <option value="">全部语言</option>
+                        <option value="zh">中文</option>
+                        <option value="en">English</option>
+                        <option value="fr">Français</option>
+                        <option value="de">Deutsch</option>
+                        <option value="es">Español</option>
+                    </select>
+                </div>
+                <button id="clearBtn" class="clear-btn">清除筛选</button>
+            </div>
+        </div>
+
+        <!-- 状态提示 -->
+        <div id="statusMessage" class="status-message" style="display: none;"></div>
+
+        <!-- 加载动画 -->
+        <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+            <div class="spinner"></div>
+            <span>正在搜索多个资源库...</span>
+        </div>
+
+        <!-- 搜索结果区域 -->
+        <div id="resultsContainer" class="results-container">
+            <!-- 初始欢迎面板 -->
+            <div class="welcome-panel">
+                <div class="welcome-icon">🔍</div>
+                <h2>开始搜索免费电子书</h2>
+                <p>输入书名或作者，同时检索多个免费图书资源库</p>
+                <div class="example-searches">
+                    <span class="example-tag" data-query="1984">1984</span>
+                    <span class="example-tag" data-query="Pride and Prejudice">Pride and Prejudice</span>
+                    <span class="example-tag" data-query="Sherlock Holmes">Sherlock Holmes</span>
+                    <span class="example-tag" data-query="三体">三体</span>
+                    <span class="example-tag" data-query="Python">Python</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分页控件 -->
+        <div id="pagination" class="pagination" style="display: none;"></div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>所有书籍信息均来自公开的免费API，本站不存储任何电子书文件，仅提供搜索和跳转服务。</p>
+            <p class="footer-links">
+                <span>数据源: Project Gutenberg · Open Library · Google Books</span>
+                <span class="divider">|</span>
+                <span>合法 · 免费 · 无广告</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- 书籍详情模态框 -->
+    <div id="bookModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div id="modalBody" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
