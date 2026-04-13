@@ -1,37 +1,22 @@
 (function(){
     "use strict";
 
-    // ---------- 全局配置 ----------
+    // ---------- API 配置 ----------
     const CONFIG = {
-        // 中文API配置 (主用)
-        zhPrimary: {
-            name: '追书神器 (中文)',
-            baseUrl: 'https://api.zhuishushenqi.com/book/fuzzy-search',
-            color: 'zhuishu'
-        },
-        // 备用API配置 (鸠摩搜书 - 仅供参考，直接调用较复杂，此处仅作示例)
-        zhBackup: {
-            name: '鸠摩搜书',
-            baseUrl: 'https://www.jiumodiary.com/search',
-            color: 'jiumo'
-        },
-        // 原英文API配置 (保留，用于搜索外文书)
-        enApis: {
-            gutenberg: { name: 'Gutenberg', baseUrl: 'https://gutendex.com/books', color: 'gutenberg' },
-            openlibrary: { name: 'Open Library', baseUrl: 'https://openlibrary.org/search.json', color: 'openlibrary' }
+        saltyleo: {
+            name: 'SaltyLeo 书库',
+            baseUrl: 'https://book-db-v1.saltyleo.com/',
+            color: 'saltyleo',
+            desc: '图书元数据库'
         }
     };
 
     // ---------- 全局状态 ----------
     let state = {
         currentQuery: '',
-        currentTab: 'all',
-        searchMode: 'zh', // 'zh' 或 'en'
-        selectedSources: ['zhuishu'], // 默认选中中文源
-        groupedResults: { zhuishu: [] },
+        groupedResults: { saltyleo: [] },
         totalResults: 0,
-        // 为英文API预留状态
-        enGroupedResults: { gutenberg: [], openlibrary: [] }
+        isLoading: false
     };
 
     // ---------- DOM 元素 ----------
@@ -48,15 +33,11 @@
         modalBody: $('modalBody'),
         modalClose: document.querySelector('.modal-close'),
         modalOverlay: document.querySelector('.modal-overlay'),
-        // 复选框
-        chkZhuishu: $('chkZhuishu'),
-        chkGutenberg: $('chkGutenberg'),
-        chkOpenlibrary: $('chkOpenlibrary'),
-        chkGoogle: $('chkGoogle')
+        sourceCheckboxes: document.querySelectorAll('.source-checkboxes input')
     };
 
     // ---------- 辅助函数 ----------
-    const escapeHtml = text => {
+    const escapeHtml = (text) => {
         if (!text) return '';
         const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
         return String(text).replace(/[&<>"']/g, m => map[m]);
@@ -68,106 +49,79 @@
         elements.statusMessage.textContent = msg;
     };
     const hideStatus = () => elements.statusMessage.style.display = 'none';
+    
     const showLoading = () => {
+        state.isLoading = true;
         elements.loadingIndicator.style.display = 'flex';
         elements.resultsContainer.innerHTML = '';
     };
-    const hideLoading = () => elements.loadingIndicator.style.display = 'none';
-
-    // 更新选中的数据源
-    const updateSelectedSources = () => {
-        state.selectedSources = [];
-        if (elements.chkZhuishu.checked) state.selectedSources.push('zhuishu');
-        if (elements.chkGutenberg.checked) state.selectedSources.push('gutenberg');
-        if (elements.chkOpenlibrary.checked) state.selectedSources.push('openlibrary');
-        if (elements.chkGoogle.checked) state.selectedSources.push('google');
+    
+    const hideLoading = () => {
+        state.isLoading = false;
+        elements.loadingIndicator.style.display = 'none';
     };
 
-    // ---------- 修改HTML，添加新的复选框 ----------
-    function updateCheckboxes() {
-        const sourceDiv = document.querySelector('.source-checkboxes');
-        if (sourceDiv) {
-            sourceDiv.innerHTML = `
-                <label class="checkbox-item"><input type="checkbox" value="zhuishu" id="chkZhuishu" checked> 追书神器 (中文)</label>
-                <label class="checkbox-item"><input type="checkbox" value="gutenberg" id="chkGutenberg"> Gutenberg</label>
-                <label class="checkbox-item"><input type="checkbox" value="openlibrary" id="chkOpenlibrary"> Open Library</label>
-                <label class="checkbox-item"><input type="checkbox" value="google" id="chkGoogle"> Google Books</label>
-            `;
-            // 重新获取元素
-            elements.chkZhuishu = $('chkZhuishu');
-            elements.chkGutenberg = $('chkGutenberg');
-            elements.chkOpenlibrary = $('chkOpenlibrary');
-            elements.chkGoogle = $('chkGoogle');
-        }
-    }
-
-    // ---------- API 请求 ----------
-    async function searchZhuiShu(query) {
-        const url = new URL(CONFIG.zhPrimary.baseUrl);
-        url.searchParams.append('query', query);
+    // ---------- API 请求：SaltyLeo ----------
+    async function searchSaltyLeo(query) {
+        const url = new URL(CONFIG.saltyleo.baseUrl);
+        url.searchParams.append('keyword', query);
+        
         try {
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return (data.books || []).map(book => ({
-                id: `zhuishu_${book._id}`,
-                source: 'zhuishu',
-                sourceName: '追书神器',
+            
+            if (!data || !data.data || !Array.isArray(data.data)) {
+                console.warn('SaltyLeo返回的数据格式不正确:', data);
+                return [];
+            }
+            
+            return data.data.map(book => ({
+                id: `saltyleo_${book.id || Math.random()}`,
+                source: 'saltyleo',
+                sourceName: 'SaltyLeo 书库',
                 title: book.title || '未知书名',
                 authors: book.author || '未知作者',
-                description: book.shortIntro || '暂无描述',
-                coverUrl: book.cover ? `https://statics.zhuishushenqi.com${book.cover}` : null,
-                // 追书神器API主要提供在线阅读，这里生成一个阅读链接
+                description: book.desc || '暂无描述',
+                coverUrl: book.cover || null,
+                publisher: book.publisher,
+                rating: book.score,
                 downloadLinks: {
-                    read: `https://www.zhuishushenqi.com/book/${book._id}`
+                    detail: book.link
                 },
-                language: 'zh',
-                rawData: book
+                language: 'zh'
             }));
         } catch(e) {
-            console.warn('追书神器搜索失败:', e);
+            console.warn('SaltyLeo 搜索失败:', e);
             return [];
         }
     }
 
-    // 英文API保留原函数，此处略...
-    
     // ---------- 搜索主流程 ----------
     async function handleSearch() {
         const query = elements.searchInput.value.trim();
         if (!query) return showStatus('请输入搜索关键词', 'warning');
         
-        state.currentQuery = query;
-        updateSelectedSources();
-        if (state.selectedSources.length === 0) return showStatus('请至少选择一个数据源', 'warning');
+        // 检查是否选中了数据源
+        const selectedSource = Array.from(elements.sourceCheckboxes).find(cb => cb.checked);
+        if (!selectedSource) return showStatus('请至少选择一个数据源', 'warning');
 
+        state.currentQuery = query;
         hideStatus();
         showLoading();
 
         try {
-            state.groupedResults = { zhuishu: [] };
-            state.enGroupedResults = { gutenberg: [], openlibrary: [] };
+            state.groupedResults = { saltyleo: [] };
             
-            // 根据选中的源发起请求
-            const promises = [];
-            if (state.selectedSources.includes('zhuishu')) promises.push(searchZhuiShu(query));
-            // 英文API的调用在此略...
+            // 目前只有一个源，直接调用
+            const results = await searchSaltyLeo(query);
+            state.groupedResults.saltyleo = results;
+            state.totalResults = results.length;
             
-            const results = await Promise.allSettled(promises);
-            
-            let idx = 0;
-            if (state.selectedSources.includes('zhuishu')) state.groupedResults.zhuishu = results[idx++]?.value || [];
-            // 英文结果处理略...
-            
-            // 合并所有结果用于显示
-            const allResults = [...state.groupedResults.zhuishu];
-            state.totalResults = allResults.length;
-            state.currentTab = 'all';
-            
-            renderResults(allResults);
+            renderResults(results);
 
             if (state.totalResults === 0) {
-                showStatus(`未找到与 "${query}" 相关的中文书籍。`, 'info');
+                showStatus(`未找到与 "${query}" 相关的书籍，试试其他关键词`, 'info');
             }
         } catch(e) {
             console.error(e);
@@ -180,7 +134,12 @@
     // ---------- 渲染结果 ----------
     function renderResults(books) {
         if (!books.length) {
-            elements.resultsContainer.innerHTML = `<div class="no-results"><div class="no-results-icon">📭</div><h3>暂无中文书籍</h3><p>试试其他关键词</p></div>`;
+            elements.resultsContainer.innerHTML = `
+                <div class="no-results">
+                    <div class="no-results-icon">📭</div>
+                    <h3>暂无中文书籍</h3>
+                    <p>试试搜索 "三体"、"活着" 或 "刘慈欣"</p>
+                </div>`;
             return;
         }
 
@@ -192,7 +151,7 @@
         `;
         elements.resultsContainer.innerHTML = html;
 
-        // 卡片详情
+        // 卡片详情事件
         document.querySelectorAll('.book-card').forEach(card => {
             card.addEventListener('click', e => {
                 if (!e.target.closest('.btn')) showBookDetail(card.dataset.id);
@@ -208,6 +167,10 @@
                                : `<div class="book-cover-placeholder">${book.title?.charAt(0)||'📖'}</div>`}
                 <div class="book-title" title="${escapeHtml(book.title)}">${escapeHtml(book.title)}</div>
                 <div class="book-author" title="${escapeHtml(book.authors)}">${escapeHtml(book.authors)}</div>
+                <div class="book-meta">
+                    ${book.publisher ? `<span>📚 ${book.publisher}</span>` : ''}
+                    ${book.rating ? `<span>⭐ ${book.rating}</span>` : ''}
+                </div>
                 <div class="book-actions">
                     ${renderActionButtons(book)}
                     <button class="btn btn-secondary" onclick="event.stopPropagation();showBookDetail('${book.id}')">详情</button>
@@ -217,14 +180,14 @@
     }
 
     function renderActionButtons(book) {
-        if (book.source === 'zhuishu') {
-            return `<a href="${book.downloadLinks.read}" target="_blank" class="btn btn-primary" onclick="event.stopPropagation()">📖 在线阅读</a>`;
+        if (book.source === 'saltyleo' && book.downloadLinks.detail) {
+            return `<a href="${book.downloadLinks.detail}" target="_blank" class="btn btn-primary" onclick="event.stopPropagation()">🔗 查看详情</a>`;
         }
         return '';
     }
 
     window.showBookDetail = function(bookId) {
-        let book = state.groupedResults.zhuishu.find(b => b.id === bookId);
+        const book = state.groupedResults.saltyleo.find(b => b.id === bookId);
         if (!book) return;
         
         const detailHtml = `
@@ -234,9 +197,11 @@
                     <span class="book-source ${book.source}">${book.sourceName}</span>
                     <h2>${escapeHtml(book.title)}</h2>
                     <p><strong>作者：</strong>${escapeHtml(book.authors)}</p>
+                    ${book.publisher ? `<p><strong>出版社：</strong>${escapeHtml(book.publisher)}</p>` : ''}
+                    ${book.rating ? `<p><strong>评分：</strong>${escapeHtml(book.rating)}</p>` : ''}
                     <p><strong>简介：</strong>${escapeHtml(book.description)}</p>
                     <div style="display:flex;gap:0.75rem;margin-top:1rem;">
-                        <a href="${book.downloadLinks.read}" target="_blank" class="btn btn-primary">📖 在线阅读</a>
+                        <a href="${book.downloadLinks.detail}" target="_blank" class="btn btn-primary">🔗 查看详情页</a>
                     </div>
                 </div>
             </div>
@@ -247,23 +212,37 @@
 
     function closeModal() { elements.modal.style.display = 'none'; }
 
-    // ---------- 初始化事件 ----------
+    // ---------- 初始化 ----------
     function init() {
-        updateCheckboxes();
+        // 更新复选框，默认只选中 SaltyLeo
+        const sourceDiv = document.querySelector('.source-checkboxes');
+        if (sourceDiv) {
+            sourceDiv.innerHTML = `
+                <label class="checkbox-item"><input type="checkbox" value="saltyleo" id="chkSaltyleo" checked> SaltyLeo (中文)</label>
+                <label class="checkbox-item"><input type="checkbox" value="gutenberg" id="chkGutenberg"> Gutenberg (英文)</label>
+            `;
+            elements.sourceCheckboxes = document.querySelectorAll('.source-checkboxes input');
+        }
+
         elements.searchBtn.addEventListener('click', handleSearch);
         elements.searchInput.addEventListener('keypress', e => e.key==='Enter' && handleSearch());
         elements.clearBtn.addEventListener('click', ()=>{
-            if (elements.chkZhuishu) elements.chkZhuishu.checked = true;
-            if (elements.chkGutenberg) elements.chkGutenberg.checked = false;
-            if (elements.chkOpenlibrary) elements.chkOpenlibrary.checked = false;
-            if (elements.chkGoogle) elements.chkGoogle.checked = false;
-            updateSelectedSources();
+            document.getElementById('chkSaltyleo').checked = true;
+            document.getElementById('chkGutenberg').checked = false;
+            elements.langSelect.value = '';
         });
         
         elements.modalClose?.addEventListener('click', closeModal);
         elements.modalOverlay?.addEventListener('click', closeModal);
         document.addEventListener('keydown', e => e.key==='Escape' && closeModal());
-        updateSelectedSources();
+        
+        // 示例搜索标签
+        document.querySelectorAll('.example-tag').forEach(tag => {
+            tag.addEventListener('click', () => {
+                elements.searchInput.value = tag.dataset.query;
+                handleSearch();
+            });
+        });
     }
 
     init();
